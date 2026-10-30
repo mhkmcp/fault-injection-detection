@@ -1,0 +1,108 @@
+{
+  "model": "m2",
+  "precision": "int8",
+  "tap_set": "default",
+  "seed": 0,
+  "designs": 66,
+  "detection": true,
+  "fault_test_probes": 120960,
+  "h2": [
+    {
+      "track": "S",
+      "best_single": "single:stem",
+      "best_single_tpr": 0.01420399983299236,
+      "joint_tpr": 0.01012066302033318,
+      "diff_single_minus_joint": 0.0040833368126591794,
+      "ci_low": 0.003063051070371781,
+      "ci_high": 0.005164216187729299,
+      "h2": "rejected (fused not better within CI)"
+    },
+    {
+      "track": "H",
+      "best_single": "single:logits",
+      "best_single_tpr": 0.044813278008298756,
+      "joint_tpr": 0.03402489626556016,
+      "diff_single_minus_joint": 0.010788381742738589,
+      "ci_low": -0.0033451155635324703,
+      "ci_high": 0.025329378182208095,
+      "h2": "rejected (fused not better within CI)"
+    }
+  ],
+  "localisation_per_layer_max": {
+    "S": {
+      "alarmed": 6254,
+      "first_alarm_in_injected_region": 0.3717620722737448,
+      "chance": 0.3333333333333333,
+      "first_alarm_tap_share": {
+        "stem": 0.2719859290054365,
+        "stage1": 0.175567636712504,
+        "stage2": 0.11080908218740007,
+        "stage3": 0.19811320754716982,
+        "pooled": 0.08506555804285257,
+        "logits": 0.15845858650463704
+      }
+    },
+    "H": {
+      "alarmed": 114,
+      "first_alarm_in_injected_region": 0.43859649122807015,
+      "chance": 0.3333333333333333,
+      "first_alarm_tap_share": {
+        "stem": 0.30701754385964913,
+        "stage1": 0.20175438596491227,
+        "stage2": 0.07894736842105263,
+        "stage3": 0.02631578947368421,
+        "pooled": 0.0,
+        "logits": 0.38596491228070173
+      }
+    }
+  },
+  "feature_cost_by_k": [
+    {
+      "k": 1,
+      "model_ms": 0.9673340000517783,
+      "features_added_ms": 0.26266599979862804
+    },
+    {
+      "k": 2,
+      "model_ms": 0.9673340000517783,
+      "features_added_ms": 0.5257279995021236
+    },
+    {
+      "k": 3,
+      "model_ms": 0.9673340000517783,
+      "features_added_ms": 0.8447284999419935
+    },
+    {
+      "k": 6,
+      "model_ms": 0.9673340000517783,
+      "features_added_ms": 1.6710405002413609
+    },
+    {
+      "k": 13,
+      "model_ms": 0.9673340000517783,
+      "features_added_ms": 2.694165999400866
+    }
+  ],
+  "thesis_result": null,
+  "git_commit": "unknown",
+  "config_hash": "1e74505a0460705d",
+  "config": {
+    "alpha": 0.01,
+    "alphas": [
+      0.05,
+      0.01,
+      0.001
+    ],
+    "iqr_floor": 1e-08,
+    "pca_components": 16
+  },
+  "device": "cpu",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "versions": {
+    "python": "3.11.6",
+    "torch": "2.11.0+cu128",
+    "numpy": "2.4.6",
+    "sklearn": "1.7.2"
+  },
+  "timestamp": "2026-10-29T06:07:10+0100"
+}

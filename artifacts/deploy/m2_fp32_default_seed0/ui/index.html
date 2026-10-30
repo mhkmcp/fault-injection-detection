@@ -1,0 +1,1150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fault Monitor Demo</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e3e3de;
+    --ok: #1f7a4d; --ok-bg: #e5f4ec; --bad: #b3261e; --bad-bg: #fbe9e7; --warn: #8a5a00;
+    --warn-bg: #fff3d6; --accent: #2f5bd3; --bar: #d9dfee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --card: #1f1f1d; --ink: #ecece8; --muted: #a3a39c; --line: #34342f;
+      --ok: #6fd3a0; --ok-bg: #173126; --bad: #ff8a80; --bad-bg: #3a1b18; --warn: #f2c25b;
+      --warn-bg: #3a2e12; --accent: #8fa9ff; --bar: #2e3550;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 20px 16px 8px; max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--muted); }
+  main { max-width: 1100px; margin: 0 auto; padding: 8px 16px 40px;
+         display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 900px) { main { grid-template-columns: 1.1fr 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 16px; min-width: 0; }
+  .card h2 { font-size: 16px; margin: 0 0 12px; }
+  .card h3 { font-size: 14px; margin: 16px 0 8px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+             gap: 6px; margin: 10px 0; }
+  .gallery canvas { width: 100%; aspect-ratio: 1; image-rendering: pixelated; cursor: pointer;
+                    border-radius: 6px; border: 2px solid transparent; }
+  .gallery canvas.sel { border-color: var(--accent); }
+  #view { width: 128px; height: 128px; image-rendering: pixelated; border-radius: 8px;
+          border: 1px solid var(--line); flex: none; }
+  .pred { font-size: 20px; font-weight: 600; }
+  .bars { margin-top: 6px; }
+  .bar { display: grid; grid-template-columns: 90px 1fr 48px; gap: 8px; align-items: center;
+         font-size: 13px; margin: 2px 0; }
+  .bar i { display: block; height: 8px; background: var(--bar); border-radius: 4px; }
+  .bar i b { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+  .chip { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 600;
+          font-size: 13px; }
+  .ok { color: var(--ok); background: var(--ok-bg); }
+  .bad { color: var(--bad); background: var(--bad-bg); }
+  .warn { color: var(--warn); background: var(--warn-bg); }
+  .meter { position: relative; height: 10px; background: var(--bar); border-radius: 5px;
+           margin: 8px 0 2px; overflow: hidden; }
+  .meter b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
+  .meter s { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--bad); }
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  select, input[type=number], button { font: inherit; color: var(--ink); background: var(--card);
+         border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; max-width: 100%; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .choice-group { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+                  margin-top: 10px; }
+  .glabel { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+  .choices label { display: inline-flex; align-items: center; gap: 8px; margin: 0;
+                   padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px;
+                   color: var(--ink); font-size: 14px; cursor: pointer; }
+  .choices input { accent-color: #f97316; margin: 0; }
+  .choices label:has(input:checked) { border-color: #f97316; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+           gap: 10px; }
+  .tile { border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .tile .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tile .d { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px;
+          font-variant-numeric: tabular-nums; }
+  th, td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  tr.macro td { font-weight: 600; }
+  .down { color: var(--bad); }
+  .cm { display: grid; grid-template-columns: auto 1fr 1fr; gap: 4px; max-width: 360px;
+        font-size: 13px; font-variant-numeric: tabular-nums; }
+  .cm div { padding: 8px; border-radius: 6px; text-align: center; }
+  .cm .h { color: var(--muted); background: none; }
+  .cm .tp, .cm .tn { background: var(--ok-bg); color: var(--ok); font-weight: 600; }
+  .cm .fp, .cm .fn { background: var(--bad-bg); color: var(--bad); font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  .flips { font: 12px/1.5 ui-monospace, Menlo, monospace; max-height: 140px; overflow: auto;
+           margin-top: 8px; color: var(--muted); white-space: pre-wrap; }
+  #status { margin-top: 8px; }
+  .full { grid-column: 1 / -1; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin-top: 10px; }
+  footer { max-width: 1100px; margin: 0 auto; padding: 0 16px 24px; }
+  /* per-layer monitor (D1, one SVDD per tap) */
+  .lrow { display: grid; grid-template-columns: 130px 1fr 74px; gap: 8px; align-items: center;
+          font-size: 13px; margin: 4px 0; }
+  .lrow .meter { margin: 0; }
+  .lrow .chip { padding: 2px 8px; font-size: 12px; text-align: center; }
+  .lrow .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .zap { color: #f97316; font-weight: 700; }
+  .pipe { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 4px 0 8px; }
+  .pipe .arrow { align-self: center; color: var(--muted); padding: 0 4px; flex: none; }
+  .lbox { flex: 1 0 110px; border: 1px solid var(--line); border-radius: 10px; padding: 8px;
+          font-size: 12px; font-variant-numeric: tabular-nums; position: relative; }
+  .lbox .t { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  .lbox .big { font-size: 18px; font-weight: 600; }
+  .lbox .muted { color: inherit; opacity: .75; font-size: 12px; }
+  .lbox.inj { border: 2px solid #f97316; }
+  .lbox.first { box-shadow: 0 0 0 3px var(--accent) inset; }
+  .lbox .tag { position: absolute; top: -9px; left: 8px; background: #f97316; color: #fff;
+               border-radius: 999px; padding: 0 7px; font-size: 11px; font-weight: 600; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+              vertical-align: -2px; margin-right: 4px; }
+  /* detector-design comparison (single / per-layer / subset / joint SVDD) */
+  :root { --g-single: #5b8def; --g-per_layer: #e8772e; --g-subset: #9b6bd6; --g-joint: #1f9d63; }
+  @media (prefers-color-scheme: dark) {
+    :root { --g-single: #8fb0ff; --g-per_layer: #ffa060; --g-subset: #c4a2f2; --g-joint: #5fd39b; }
+  }
+  .facts { margin: 8px 0 14px; padding-left: 18px; }
+  .facts li { margin: 5px 0; }
+  .cmp-group { margin: 12px 0 4px; font-size: 12px; font-weight: 600; text-transform: uppercase;
+               letter-spacing: .04em; color: var(--muted); }
+  .crow { display: grid; grid-template-columns: minmax(140px, 240px) 1fr 58px 118px; gap: 4px 10px;
+          align-items: center; font-size: 13px; margin: 5px 0; }
+  .crow .name { line-height: 1.25; overflow-wrap: anywhere; }
+  .crow .track { position: relative; height: 14px; background: var(--bar); border-radius: 4px; }
+  .crow .track b { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+  .crow .track s { position: absolute; top: -3px; bottom: -3px; width: 2px;
+                   background: var(--muted); opacity: .8; }
+  .crow .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .crow .cost { text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap;
+                font-variant-numeric: tabular-nums; }
+  .crow.best .name { font-weight: 700; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+            margin-right: 6px; vertical-align: 0; }
+  .strip { position: relative; height: 150px; border-left: 1px solid var(--line);
+           border-bottom: 1px solid var(--line); margin: 8px 0 44px 40px; }
+  .strip i { position: absolute; width: 9px; height: 9px; border-radius: 50%; margin: -4px 0 0 -4px;
+             opacity: .8; }
+  .strip .ax { position: absolute; font-size: 11px; color: var(--muted); }
+  @media (max-width: 560px) {
+    .crow { grid-template-columns: 1fr 54px; margin: 8px 0; }
+    .crow .name { grid-column: 1 / -1; }
+    .crow .cost { grid-column: 1 / -1; text-align: left; margin-top: -2px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Image classifier with a built-in fault monitor</h1>
+  <p>Everything runs in this browser from <code>model.onnx</code>. No server-side computation, no
+     training data.</p>
+</header>
+<main>
+  <section class="card">
+    <h2>1 · Pick a picture</h2>
+    <div class="row">
+      <input type="file" id="upload" accept="image/*" capture="environment" hidden>
+      <button id="uploadBtn">Upload or take a photo</button>
+      <span class="muted">or choose one of the test pictures below</span>
+    </div>
+    <div class="gallery" id="gallery"></div>
+    <div class="row" style="align-items:flex-start">
+      <canvas id="view" width="32" height="32"></canvas>
+      <div style="flex:1;min-width:200px">
+        <div class="muted" id="truth"></div>
+        <div class="pred" id="pred">…</div>
+        <div class="bars" id="bars"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2 · What the monitor says about this picture</h2>
+    <div class="row">
+      <span class="chip" id="verdict">…</span>
+      <span class="chip" id="answer" hidden></span>
+    </div>
+    <div class="meter"><b id="meterFill"></b><s id="meterTau"></s></div>
+    <div class="muted" id="scoreText"></div>
+    <div id="layerBox" hidden>
+      <h3>Layer by layer <span class="muted">· one SVDD per layer</span></h3>
+      <div id="layerRows"></div>
+      <div class="muted" id="layerNote" style="margin-top:6px"></div>
+    </div>
+    <div style="margin-top:12px">
+      <label for="alpha">Allowed false alarms on a healthy model</label>
+      <select id="alpha"></select>
+    </div>
+    <p class="muted">A corrupted weight affects every picture, so the monitor is judged over
+      many pictures (section 4). A healthy model still flags about the allowed share.</p>
+  </section>
+
+  <section class="card full">
+    <h2>3 · Damage the memory</h2>
+    <p class="muted" style="margin-top:0">This flips bits in a copy of the model's weights, the
+      way a memory fault or a bit-flip attack would. First choose the number format the weights
+      are stored in: every weight is converted to it, and the flips then hit that format's bits.
+      The file on disk is never changed.</p>
+    <div class="choice-group"><div class="glabel">Injection in weight</div>
+      <div class="choices" id="fmt"></div>
+      <div class="muted" id="fmtNote" style="margin-top:8px"></div></div>
+    <div class="choice-group"><div class="glabel">Where</div>
+      <div class="choices" id="where"></div></div>
+    <div class="choice-group"><div class="glabel">Which bit</div>
+      <div class="choices" id="how"></div></div>
+    <div class="choice-group"><div class="glabel">How many flips</div>
+      <div class="choices" id="count"></div></div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="inject">Flip bits</button>
+      <button id="surprise">Surprise me</button>
+      <button id="restore">Reset model</button>
+      <span class="chip ok" id="modelState">Model intact</span>
+    </div>
+    <div class="flips" id="flips"></div>
+    <details>
+      <summary>Advanced: flip one exact bit</summary>
+      <div class="grid3" style="margin-top:10px">
+        <div><label for="layer">Layer</label><select id="layer" style="width:100%"></select></div>
+        <div><label for="index">Weight index</label>
+          <input type="number" id="index" value="0" min="0" style="width:100%"></div>
+        <div><label for="bit" id="bitLabel">Bit (0 = lowest, 31 = sign)</label>
+          <input type="number" id="bit" value="30" min="0" max="31" style="width:100%"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="exact">Flip this bit</button><span class="muted" id="exactErr"></span>
+      </div>
+    </details>
+    <div class="muted" id="status">Loading model…</div>
+  </section>
+
+  <section class="card full">
+    <h2>4 · Scores on <span id="nSamples">the</span> test pictures</h2>
+
+    <h3>Classifier: is the answer right?</h3>
+    <div class="tiles" id="clsTiles"></div>
+    <details>
+      <summary>Per-class precision, recall and F1</summary>
+      <div class="scroll"><table id="clsTable"></table></div>
+    </details>
+
+    <h3>Fault monitor: does it catch the corrupted model?</h3>
+    <p class="muted" id="detNote" style="margin-top:0"></p>
+    <div class="tiles" id="detTiles"></div>
+    <div class="row" style="margin-top:12px;align-items:flex-start">
+      <div>
+        <div class="muted" style="margin-bottom:6px">Confusion matrix</div>
+        <div class="cm" id="cm"></div>
+      </div>
+      <div style="flex:1;min-width:240px">
+        <div class="muted" style="margin-bottom:6px">Recall, kept separate by what the fault did
+          to the answer</div>
+        <div class="scroll"><table id="splitTable"></table></div>
+      </div>
+    </div>
+    <div id="layerSection" hidden>
+      <h3>Which layer notices the fault? <span class="muted">· one SVDD per layer</span></h3>
+      <p class="muted" id="layerSummary" style="margin-top:0"></p>
+      <div class="pipe" id="pipe"></div>
+      <div class="legend">
+        <span><i style="border:2px solid #f97316"></i>bits flipped in weights feeding this layer</span>
+        <span><i style="box-shadow:0 0 0 3px var(--accent) inset"></i>layer that alarms first most
+          often</span>
+        <span><i style="background:color-mix(in srgb, var(--bad) 45%, var(--card))"></i>darker =
+          flags more corrupted pictures than healthy ones</span>
+      </div>
+      <details>
+        <summary>Per-layer table</summary>
+        <div class="scroll"><table id="layerTable"></table></div>
+      </details>
+    </div>
+    <details>
+      <summary>How these are computed</summary>
+      <p class="muted">Each test picture is run twice: once through the original model
+        (<b>negative</b>, should not be flagged) and once through the current, corrupted model
+        (<b>positive</b>, should be flagged). TP = corrupted and flagged, FN = corrupted and
+        missed, FP = original and flagged, TN = original and not flagged. Recall = TP / (TP+FN),
+        precision = TP / (TP+FP), F1 = 2·P·R / (P+R), F2 = 5·P·R / (4·P+R),
+        false-alarm rate = FP / (FP+TN). F2 counts recall four times as much as precision,
+        because for a fault monitor a missed corruption is worse than a false alarm.
+        Precision, F1 and F2 depend on the 50 / 50 mix used here; recall and false-alarm rate do
+        not.
+        With a weight format other than FP32, "original" means the model in that format before
+        any flips, so the format change alone is never counted as a detected fault.
+        A fault that leaves an answer unchanged is not harmless in itself, but it cannot be seen
+        from the answer, so it is reported separately and never mixed with changed answers.</p>
+      <p class="muted">Layer by layer: besides the main monitor (one SVDD over all layers
+        together), every observed layer has its own SVDD and its own threshold, both fixed on
+        healthy calibration pictures at the same allowed false-alarm share. A layer's
+        "flagged" rate is its alarm rate on the corrupted model; its "false alarms" are on the
+        model before flips. "Alarms first" is the earliest layer, in the order the picture flows
+        through the network, that is over its threshold. A flipped weight changes the activations
+        of the next observed layer first, so that is where the orange frame goes. Because each
+        layer may false-alarm at the allowed share on its own, "any layer" false-alarms more often
+        than the main monitor.</p>
+    </details>
+    <p class="muted" id="reference"></p>
+  </section>
+  <section class="card full" id="cmpSection" hidden>
+    <h2>5 · One layer, every layer, a few layers, or all together?</h2>
+    <p class="muted" id="cmpIntro" style="margin-top:0"></p>
+    <div class="row">
+      <div class="choice-group" style="margin:0"><div class="glabel">Which faults</div>
+        <div class="choices" id="cmpTrack"></div></div>
+      <div class="choice-group" style="margin:0"><div class="glabel">Score</div>
+        <div class="choices" id="cmpMetric"></div></div>
+      <div class="choice-group" style="margin:0" id="cmpPrecBox"><div class="glabel">Model</div>
+        <div class="choices" id="cmpPrec"></div></div>
+    </div>
+    <h3>What the numbers say</h3>
+    <ul class="facts" id="cmpFacts"></ul>
+    <div class="legend" id="cmpLegend"></div>
+    <div id="cmpChart"></div>
+    <details id="cmpStripBox" hidden>
+      <summary>Every possible group of layers (exploratory)</summary>
+      <p class="muted">Each dot is one SVDD fitted on one combination of layers, plotted by how
+        many layers it watches. The combinations are picked here with hindsight, using the fault
+        results themselves, so the best dot is an upper bound, not a design you could choose in
+        advance.</p>
+      <div class="strip" id="cmpStrip"></div>
+    </details>
+    <details>
+      <summary>Full table</summary>
+      <div class="scroll"><table id="cmpTable"></table></div>
+    </details>
+    <details>
+      <summary>How this was measured</summary>
+      <p class="muted">Every design is an SVDD (one-class SVM, RBF kernel) fitted on healthy
+        pictures only, with its settings and its threshold chosen on healthy calibration
+        pictures, so no fault ever shaped a detector. <b>Single layer</b>: one SVDD watching one
+        layer. <b>Per layer</b>: one SVDD per layer, each score turned into "how unusual compared
+        with healthy pictures", then combined by the most unusual layer (max), the average
+        (mean) or a weighting by each layer's false-alarm rate. <b>Subset</b>: one SVDD over the
+        joined features of a group of layers, grouped by position, by leaving one layer out, or
+        added one at a time by lowest false-alarm rate on healthy data. <b>Joint</b>: one SVDD
+        over all layers. Detection rate is the share of corrupted inferences flagged when the
+        threshold allows the chosen share of false alarms; ranking quality (AUROC) is the chance
+        that a corrupted inference scores higher than a healthy one, 50 % being a coin toss.
+        Differences come with a 95 % interval from resampling whole injections; an interval that
+        contains zero is "no detected difference". Cost is the time to score one picture once its
+        layer features exist; observing more layers also costs more feature extraction, shown in
+        the facts above.</p>
+    </details>
+  </section>
+</main>
+<footer class="muted" id="foot"></footer>
+
+<script src="ort.wasm.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+ort.env.wasm.wasmPaths = './';
+ort.env.wasm.numThreads = 1;
+
+// fp32*: the exported model. base*: the chosen weight format, no flips. session/curOut: with flips.
+const S = { manifest: null, original: null, samples: [], current: null, alpha: 1, flips: [],
+            nTaps: 0,
+            fp32Session: null, fp32Out: [], formats: [], fmt: null, E: null, baseBytes: null,
+            baseSession: null, baseOut: [], session: null, curOut: [] };
+const N_PIX = 32 * 32 * 3, GALLERY = 40;
+
+function draw(canvas, pixels) {
+  const ctx = canvas.getContext('2d'), img = ctx.createImageData(32, 32);
+  for (let i = 0, j = 0; i < N_PIX; i += 3, j += 4) {
+    img.data[j] = pixels[i]; img.data[j + 1] = pixels[i + 1]; img.data[j + 2] = pixels[i + 2];
+    img.data[j + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+async function fileToPixels(file) {
+  const bmp = await createImageBitmap(file);
+  const c = new OffscreenCanvas(32, 32), ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bmp, 0, 0, 32, 32);
+  const rgba = ctx.getImageData(0, 0, 32, 32).data, px = new Uint8Array(N_PIX);
+  for (let i = 0, j = 0; i < N_PIX; i += 3, j += 4) {
+    px[i] = rgba[j]; px[i + 1] = rgba[j + 1]; px[i + 2] = rgba[j + 2];
+  }
+  return px;
+}
+
+async function infer(list, session = S.session) {
+  const data = new Uint8Array(list.length * N_PIX);
+  list.forEach((p, k) => data.set(p, k * N_PIX));
+  const o = await session.run({ images: new ort.Tensor('uint8', data, [list.length, 32, 32, 3]) });
+  const c = S.manifest.classes.length, na = S.manifest.monitor.alphas.length, nt = S.nTaps;
+  return list.map((_, k) => ({
+    probs: Array.from(o.probs.data.slice(k * c, (k + 1) * c)),
+    pred: Number(o.pred.data[k]),
+    score: Number(o.score.data[k]),
+    alarms: Array.from(o.alarms.data.slice(k * na, (k + 1) * na)).map(Boolean),
+    ...(nt && o.tap_scores ? {
+      tapScores: Array.from(o.tap_scores.data.slice(k * nt, (k + 1) * nt), Number),
+      // tap_alarms is (N, K, A): tapAlarms[t][a]
+      tapAlarms: Array.from({ length: nt }, (_, t) => Array.from(
+        o.tap_alarms.data.slice((k * nt + t) * na, (k * nt + t + 1) * na)).map(Boolean)),
+    } : {}),
+  }));
+}
+
+// ---------- metrics ----------
+const div = (a, b) => (b ? a / b : NaN);
+// F-beta: beta = 1 weighs precision and recall equally, beta = 2 counts recall four times as much
+const fbeta = (p, r, b) => (b * b * p + r ? (1 + b * b) * p * r / (b * b * p + r) : 0);
+const f1 = (p, r) => fbeta(p, r, 1), f2 = (p, r) => fbeta(p, r, 2);
+const fmt = v => (Number.isFinite(v) ? (100 * v).toFixed(1) + '%' : '—');
+
+function classifierMetrics(out, labels, nClasses) {
+  const tp = Array(nClasses).fill(0), fp = [...tp], fn = [...tp], support = [...tp];
+  out.forEach((o, i) => {
+    const y = labels[i];
+    support[y]++;
+    if (o.pred === y) tp[y]++; else { fp[o.pred]++; fn[y]++; }
+  });
+  const per = tp.map((_, c) => {
+    const p = div(tp[c], tp[c] + fp[c]) || 0, r = div(tp[c], tp[c] + fn[c]) || 0;
+    return { precision: p, recall: r, f1: f1(p, r), f2: f2(p, r), support: support[c] };
+  });
+  const mean = k => per.reduce((s, x) => s + x[k], 0) / per.length;
+  return { accuracy: div(tp.reduce((a, b) => a + b, 0), out.length), per,
+           macro: { precision: mean('precision'), recall: mean('recall'), f1: mean('f1'),
+                    f2: mean('f2') } };
+}
+
+function detectorMetrics(clean, faulty, k) {
+  const fp = clean.filter(o => o.alarms[k]).length, tn = clean.length - fp;
+  if (!faulty) return { fp, tn, fpr: div(fp, fp + tn) };
+  const tp = faulty.filter(o => o.alarms[k]).length, fn = faulty.length - tp;
+  const p = div(tp, tp + fp), r = div(tp, tp + fn);
+  const group = changed => {
+    const idx = faulty.map((o, i) => i).filter(i => (faulty[i].pred !== clean[i].pred) === changed);
+    const hit = idx.filter(i => faulty[i].alarms[k]).length;
+    return { n: idx.length, hit, recall: div(hit, idx.length) };
+  };
+  return { tp, fn, fp, tn, precision: p, recall: r, f1: Number.isFinite(p) ? f1(p, r) : NaN,
+           f2: Number.isFinite(p) ? f2(p, r) : NaN,
+           fpr: div(fp, fp + tn), accuracy: div(tp + tn, tp + fn + fp + tn),
+           changed: group(true), unchanged: group(false) };
+}
+
+function windowAlarm(flags, n = 8, m = 3) {
+  for (let i = 0; i < flags.length; i++) {
+    let s = 0;
+    for (let j = Math.max(0, i - n + 1); j <= i; j++) s += flags[j];
+    if (s >= m) return true;
+  }
+  return false;
+}
+
+function tile(name, value, detail = '') {
+  return `<div class="tile"><div class="muted">${name}</div><div class="v">${value}</div>` +
+         `<div class="d">${detail}</div></div>`;
+}
+
+function renderScores() {
+  const m = S.manifest, cls = m.classes, k = S.alpha, corrupted = S.flips.length > 0;
+  const fp32 = S.fmt.key === 'fp32', name = S.fmt.label;
+  const before = fp32 ? 'original' : `${name} before flips`;
+  const labels = S.samples.map(s => cls.indexOf(s.label));
+  const orig = classifierMetrics(S.fp32Out, labels, cls.length);
+  const base = classifierMetrics(S.baseOut, labels, cls.length);
+  const cur = classifierMetrics(S.curOut, labels, cls.length);
+  const ref = corrupted ? base : orig, shifted = corrupted || !fp32;
+  const vs = (b, o) => [corrupted && `${before} ${fmt(b)}`, !fp32 && `FP32 original ${fmt(o)}`]
+    .filter(Boolean).join(' · ') || 'original model';
+  const macro = (title, key) =>
+    tile(title, fmt(cur.macro[key]), vs(base.macro[key], orig.macro[key]));
+
+  $('clsTiles').innerHTML =
+    tile('Accuracy', fmt(cur.accuracy), vs(base.accuracy, orig.accuracy)) +
+    macro('Precision (macro)', 'precision') + macro('Recall (macro)', 'recall') +
+    macro('F1-score (macro)', 'f1') + macro('F2-score (macro)', 'f2');
+  const cell = (v, r) => `<td class="${shifted && v < r - 1e-9 ? 'down' : ''}">${fmt(v)}</td>`;
+  $('clsTable').innerHTML =
+    '<tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1-score</th><th>F2-score</th>' +
+    '<th>Pictures</th></tr>' +
+    cur.per.map((x, c) => `<tr><td>${cls[c]}</td>${cell(x.precision, ref.per[c].precision)}` +
+      `${cell(x.recall, ref.per[c].recall)}${cell(x.f1, ref.per[c].f1)}` +
+      `${cell(x.f2, ref.per[c].f2)}<td>${x.support}</td></tr>`).join('') +
+    `<tr class="macro"><td>Macro average</td><td>${fmt(cur.macro.precision)}</td>` +
+    `<td>${fmt(cur.macro.recall)}</td><td>${fmt(cur.macro.f1)}</td><td>${fmt(cur.macro.f2)}</td>` +
+    `<td>${S.samples.length}</td></tr>`;
+
+  const d = detectorMetrics(S.baseOut, corrupted ? S.curOut : null, k);
+  const win = windowAlarm(S.curOut.map(o => (o.alarms[k] ? 1 : 0)));
+  const winTile = tile('Window alarm (3 of 8)',
+    `<span class="chip ${win ? 'bad' : 'ok'}">${win ? 'ALARM' : 'quiet'}</span>`,
+    corrupted ? 'should fire' : 'should stay quiet');
+  if (!corrupted) {
+    $('detNote').textContent = (fp32 ? 'The model is intact, so there is nothing to catch yet: ' +
+      'only false alarms can be measured.' : `The weights are stored as ${name} and no bits are ` +
+      'flipped yet. The monitor was calibrated on the FP32 model, so false alarms above the ' +
+      'allowed share here come from the format change itself, not from a bit flip.') +
+      ' Flip some bits in section 3 to measure recall.';
+    $('detTiles').innerHTML =
+      tile('False-alarm rate', fmt(d.fpr), `allowed ${fmt(m.monitor.alphas[k])}`) +
+      tile('Recall', '—', 'needs a corrupted model') +
+      tile('Precision', '—', '') + tile('F1-score', '—', '') + tile('F2-score', '—', '') +
+      winTile;
+  } else {
+    $('detNote').textContent = `${S.samples.length} pictures through the ` +
+      `${fp32 ? 'original model' : `${name} model before flips`} (should not be flagged) and ` +
+      `the same ${S.samples.length} through the corrupted model (should be flagged).` +
+      (fp32 ? '' : ` The monitor's thresholds come from the FP32 model, so its false-alarm ` +
+       `rate on the ${name} model can exceed the allowed share.`);
+    $('detTiles').innerHTML =
+      tile('Recall (detection rate)', fmt(d.recall), `${d.tp} of ${d.tp + d.fn} caught`) +
+      tile('Precision', fmt(d.precision), `${d.tp} of ${d.tp + d.fp} alarms were real`) +
+      tile('F1-score', fmt(d.f1), 'precision and recall equally') +
+      tile('F2-score', fmt(d.f2), 'recall weighted 4× — a missed fault costs more') +
+      tile('False-alarm rate', fmt(d.fpr), `allowed ${fmt(m.monitor.alphas[k])}`) +
+      tile('Accuracy', fmt(d.accuracy), 'of all flag / no-flag decisions') + winTile;
+  }
+  const n = v => (v === undefined ? '—' : v);
+  $('cm').innerHTML =
+    '<div class="h"></div><div class="h">flagged</div><div class="h">not flagged</div>' +
+    `<div class="h">corrupted</div><div class="tp">TP ${n(d.tp)}</div><div class="fn">FN ${n(d.fn)}</div>` +
+    `<div class="h">${fp32 ? 'original' : 'before flips'}</div><div class="fp">FP ${d.fp}</div><div class="tn">TN ${d.tn}</div>`;
+  $('splitTable').innerHTML =
+    '<tr><th>Corrupted-model pictures</th><th>Pictures</th><th>Flagged</th><th>Recall</th></tr>' +
+    (corrupted ? [['Answer changed by the fault', d.changed],
+                  ['Answer unchanged', d.unchanged]].map(([name, g]) =>
+      `<tr><td>${name}</td><td>${g.n}</td><td>${g.hit}</td><td>${fmt(g.recall)}</td></tr>`).join('')
+      : '<tr><td colspan="4" class="muted">Corrupt the model to fill this in.</td></tr>');
+  renderLayerScores();
+}
+
+// ---------- per-layer monitor (D1: one SVDD per tap) ----------
+const L = () => S.manifest.monitor.per_layer;
+const firstAlarm = (o, a) => (o.tapAlarms ? o.tapAlarms.findIndex(x => x[a]) : -1);
+
+function injectedPerTap() {  // flips per tap: the first observed layer after the flipped weight
+  const n = Array(S.nTaps).fill(0), ids = L().taps.map(t => t.id);
+  for (const f of S.flips) { const k = ids.indexOf(f.w.tap); if (k >= 0) n[k]++; }
+  return n;
+}
+
+function renderLayerPicture(r) {
+  if (!S.nTaps || !r.tapScores) return;
+  const a = S.alpha, pl = L(), inj = injectedPerTap(), first = firstAlarm(r, a);
+  $('layerRows').innerHTML = pl.taps.map((t, k) => {
+    const tau = pl.thresholds[k][a], [lo, hi] = pl.display_range[k], s = r.tapScores[k];
+    const pos = v => Math.min(100, Math.max(0, 100 * (v - lo) / (hi - lo)));
+    const over = r.tapAlarms[k][a];
+    return `<div class="lrow"><span class="name" title="${t.id}">` +
+      `${inj[k] ? '<span class="zap" title="bits flipped in weights feeding this layer">⚡</span> ' : ''}` +
+      `${t.label}</span><div class="meter"><b style="width:${Number.isFinite(s) ? pos(s) : 100}%;` +
+      `${over ? 'background:var(--bad)' : ''}"></b><s style="left:${pos(tau)}%"></s></div>` +
+      `<span class="chip ${over ? 'bad' : 'ok'}">${over ? (k === first ? 'first!' : 'over') : 'ok'}` +
+      '</span></div>';
+  }).join('');
+  const injNames = pl.taps.filter((_, k) => inj[k]).map(t => t.label);
+  $('layerNote').innerHTML = (first < 0 ? 'No layer is over its own threshold for this picture.'
+    : `First layer over its threshold: <b>${pl.taps[first].label}</b>.`) +
+    (injNames.length ? ` Bits were flipped in weights feeding <span class="zap">⚡</span> ` +
+      `<b>${injNames.join(', ')}</b>.` : '');
+}
+
+function renderLayerScores() {
+  if (!S.nTaps || !S.baseOut[0]?.tapAlarms) return;
+  const a = S.alpha, pl = L(), n = S.samples.length, corrupted = S.flips.length > 0;
+  const inj = injectedPerTap();
+  const rate = (out, k) => out.filter(o => o.tapAlarms[k][a]).length / n;
+  const fpr = pl.taps.map((_, k) => rate(S.baseOut, k));
+  const det = pl.taps.map((_, k) => (corrupted ? rate(S.curOut, k) : NaN));
+  const firsts = Array(S.nTaps).fill(0);
+  if (corrupted) S.curOut.forEach(o => { const f = firstAlarm(o, a); if (f >= 0) firsts[f]++; });
+  const top = corrupted && Math.max(...firsts) > 0 ? firsts.indexOf(Math.max(...firsts)) : -1;
+  const anyRate = out => out.filter(o => o.tapAlarms.some(x => x[a])).length / n;
+
+  $('pipe').innerHTML = pl.taps.map((t, k) => {
+    const lift = corrupted ? Math.max(0, det[k] - fpr[k]) : 0;
+    const bg = `color-mix(in srgb, var(--bad) ${Math.round(70 * Math.min(1, lift / 0.5))}%, var(--card))`;
+    return (k ? '<span class="arrow">→</span>' : '') +
+      `<div class="lbox${inj[k] ? ' inj' : ''}${k === top ? ' first' : ''}" style="background:${bg}"` +
+      ` title="${t.id}">${inj[k] ? `<span class="tag">⚡ ${inj[k]} flip${inj[k] > 1 ? 's' : ''}</span>` : ''}` +
+      `<div class="t">${t.label}</div>` +
+      `<div class="big">${corrupted ? fmt(det[k]) : '—'}</div><div>flagged</div>` +
+      `<div class="muted">false alarms ${fmt(fpr[k])}</div>` +
+      (corrupted ? `<div class="muted">alarms first ${firsts[k]}×</div>` : '') + '</div>';
+  }).join('');
+
+  const injNames = pl.taps.filter((_, k) => inj[k]).map(t => t.label);
+  const allowed = fmt(S.manifest.monitor.alphas[a]);
+  if (!corrupted) {
+    $('layerSummary').textContent = `Each layer has its own detector, allowed ${allowed} false ` +
+      `alarms. Any layer together: ${fmt(anyRate(S.baseOut))} of healthy pictures flagged. ` +
+      'Flip some bits in section 3 to see which layer reacts.';
+  } else {
+    const d2 = S.curOut.filter(o => o.alarms[a]).length / n;
+    $('layerSummary').innerHTML =
+      (injNames.length ? `Bits were flipped in weights feeding <b>${injNames.join(', ')}</b>. `
+        : '') +
+      (top >= 0 ? `The layer that alarms first most often is <b>${pl.taps[top].label}</b> ` +
+        `(${firsts[top]} of ${n} corrupted pictures)` +
+        (injNames.length ? (inj[top] ? ', the injected layer itself.'
+          : (top > pl.taps.findIndex((_, k) => inj[k]) ? ', further down the network: the ' +
+             'damage shows up later than where it was injected.' : '.')) : '.')
+        : 'No layer reacted more than on a healthy model: the fault is invisible layer by layer.') +
+      ` Any layer flags ${fmt(anyRate(S.curOut))} of corrupted pictures ` +
+      `(${fmt(anyRate(S.baseOut))} of healthy ones); the main monitor flags ${fmt(d2)}.`;
+  }
+  $('layerTable').innerHTML =
+    '<tr><th>Layer</th><th>Flips feeding it</th><th>False alarms (before flips)</th>' +
+    '<th>Flagged (corrupted)</th><th>Alarms first</th><th>Threshold</th></tr>' +
+    pl.taps.map((t, k) => `<tr><td>${inj[k] ? '<span class="zap">⚡</span> ' : ''}${t.label}</td>` +
+      `<td>${inj[k]}</td><td>${fmt(fpr[k])}</td><td>${corrupted ? fmt(det[k]) : '—'}</td>` +
+      `<td>${corrupted ? firsts[k] : '—'}</td><td>${pl.thresholds[k][a].toFixed(2)}</td></tr>`)
+      .join('') +
+    `<tr class="macro"><td>Any layer</td><td>${S.flips.length}</td>` +
+    `<td>${fmt(anyRate(S.baseOut))}</td><td>${corrupted ? fmt(anyRate(S.curOut)) : '—'}</td>` +
+    '<td></td><td></td></tr>';
+}
+
+// ---------- detector-design comparison (recorded offline by `fidnn granularity`) ----------
+const G_LABEL = { single: 'Single layer', per_layer: 'Per layer, combined', subset: 'Subset of layers',
+                  joint: 'Joint (all layers)' };
+const TRACK_FAULTS = { H: 'faults that make the answer wrong or break the model',
+                       S: 'faults that leave the answer unchanged' };
+const C = { prec: null, track: 'H', metric: 'tpr' };
+
+function tapLabel(id) {
+  const t = S.manifest.monitor.per_layer?.taps.find(x => x.id === id);
+  return t ? t.label : id;
+}
+
+function designLabel(r) {
+  const [, rest] = r.design.split(':');
+  if (r.granularity === 'single') return tapLabel(rest);
+  if (r.granularity === 'joint') return `All ${r.k} layers`;
+  if (r.granularity === 'per_layer') return { max: 'Most unusual layer (max)', mean: 'Average of layers',
+    fpr_weighted: 'Weighted by false alarms' }[r.rule] || rest;
+  const taps = r.taps.split('+').map(tapLabel).join(' + ');
+  if (r.rule === 'leave_one_out') return `All but ${tapLabel(rest.replace('without_', ''))}`;
+  if (r.rule === 'greedy_clean') return `${taps} (picked on healthy data)`;
+  return taps;
+}
+
+function cmpData() {
+  const cmp = S.manifest.comparison?.[C.prec];
+  const a = S.manifest.monitor.alphas[S.alpha];
+  const rows = (cmp?.rows || []).filter(r => !r.oracle &&
+    (cmp.detection ? r.track === C.track : true) && Math.abs(r.alpha - a) < 1e-12);
+  const oracle = (cmp?.rows || []).filter(r => r.oracle && r.track === C.track &&
+    Math.abs(r.alpha - a) < 1e-12);
+  return { cmp, a, rows, oracle };
+}
+
+function pairedFor(cmp, design, metric) {
+  return cmp.paired.find(p => p.design === design && p.track === C.track && p.metric === metric);
+}
+
+const pp = v => (v >= 0 ? '+' : '−') + (100 * Math.abs(v)).toFixed(1);
+function diffText(p) {
+  if (!p) return '';
+  const ci = `${pp(p.difference)} points, 95 % interval ${pp(p.ci_low)} to ${pp(p.ci_high)}`;
+  if (p.verdict !== 'difference') return `${ci}: no detected difference`;
+  // with ~10^5 probes a 1-point gap is "significant"; say when it is too small to matter
+  return Math.abs(p.difference) < 0.02 ? `${ci}: real, but too small to matter` : ci;
+}
+
+function renderComparison() {
+  const { cmp, a, rows, oracle } = cmpData();
+  if (!cmp || !rows.length) return;
+  const metric = cmp.detection ? C.metric : 'fpr';
+  const val = r => (metric === 'tpr' ? r.tpr : metric === 'auroc' ? r.auroc : r.measured_fpr);
+  const chance = metric === 'auroc' ? 0.5 : a;
+  const metricKey = metric === 'auroc' ? 'auroc' : `tpr@${a}`;
+  const allowed = `${(100 * a).toLocaleString()} %`;
+  $('cmpIntro').innerHTML = cmp.detection
+    ? `The same fault monitor can watch one layer, every layer separately, a group of layers or all
+       of them at once. These results were measured on the <b>${C.prec.toUpperCase()}</b> model's
+       fault sweep (${cmp.fault_test_probes.toLocaleString()} corrupted inferences held out for
+       testing, ${cmp.seeds} training seed): recorded numbers, not computed live on this page.
+       The false-alarm setting in section 2 (now ${allowed}) applies here too.`
+    : `No fault sweep exists for the ${C.prec.toUpperCase()} model yet, so only false alarms on
+       healthy pictures and scoring cost are shown.`;
+
+  const byG = g => rows.filter(r => r.granularity === g);
+  const best = g => byG(g).reduce((m, r) => (m && val(m) >= val(r) ? m : r), null);
+  const joint = byG('joint')[0];
+  const facts = [];
+  if (cmp.detection && joint) {
+    const bs = best('single'), bp = best('per_layer');
+    const bsub = byG('subset').filter(r => r.rule !== 'exhaustive')
+      .reduce((m, r) => (m && val(m) >= val(r) ? m : r), null);
+    const unit = metric === 'auroc' ? 'ranking quality' : `detection rate at ${allowed} false alarms`;
+    facts.push(`<b>All layers together</b> reach a ${unit} of <b>${fmt(val(joint))}</b>` +
+      (metric === 'tpr' ? ` (a monitor that guessed would reach ${allowed})` : ' (coin toss: 50 %)') + '.');
+    if (bs) facts.push(`<b>Best single layer</b>: ${designLabel(bs)}, <b>${fmt(val(bs))}</b>. ` +
+      `Compared with all layers: ${diffText(pairedFor(cmp, bs.design, metricKey))}. ` +
+      '<span class="muted">This "best" is picked after seeing the results, which flatters the single ' +
+      'layer.</span>');
+    if (bp) facts.push(`<b>Best per-layer combination</b>: ${designLabel(bp)}, <b>${fmt(val(bp))}</b>, ` +
+      `needing ${bp.n_svdd} separate SVDDs. Compared with all layers: ` +
+      `${diffText(pairedFor(cmp, bp.design, metricKey))}.`);
+    if (bsub) facts.push(`<b>Best subset</b>: ${designLabel(bsub)}, <b>${fmt(val(bsub))}</b>. ` +
+      `Compared with all layers: ${diffText(pairedFor(cmp, bsub.design, metricKey))}.`);
+    const h2 = (cmp.h2 || []).find(h => h.track === C.track);
+    if (h2 && metric === 'tpr' && Math.abs(a - 0.01) < 1e-12)
+      facts.push(`<b>Thesis hypothesis H2</b> ("combining layers beats the best single layer", at
+        1 % false alarms): <b>${h2.h2.startsWith('supported') ? 'supported' : 'not supported'}</b>
+        for ${TRACK_FAULTS[C.track]}.`);
+    const spread = rows.map(r => r.auroc);
+    if (Math.max(...spread) < 0.56 && Math.min(...spread) > 0.44)
+      facts.push(`<b>No design sees these faults.</b> Every design's ranking quality lies between
+        ${fmt(Math.min(...spread))} and ${fmt(Math.max(...spread))}, a coin toss: for
+        ${TRACK_FAULTS[C.track]}, the layers' activations look like a healthy model's.`);
+    const loc = cmp.localisation?.[C.track];
+    if (loc) facts.push(`<b>Does the per-layer monitor point at the damaged layer?</b> Of
+      ${loc.alarmed.toLocaleString()} flagged inferences, the first layer over its threshold lies
+      in the region (early / middle / late) that was corrupted in ${fmt(loc.first_alarm_in_injected_region)},
+      against ${fmt(loc.chance)} by chance.`);
+  }
+  if (joint) {
+    const pl = byG('per_layer')[0], sg = byG('single');
+    const cost = cmp.feature_cost_by_k || [];
+    const fc = k => cost.find(c => c.k === k);
+    const sgMs = sg.length ? sg.reduce((s, r) => s + r.latency_ms_b1, 0) / sg.length : NaN;
+    facts.push(`<b>Cost per picture</b> (scoring only): one layer ${sgMs.toFixed(2)} ms, all
+      layers jointly ${joint.latency_ms_b1.toFixed(2)} ms, per-layer combination
+      ${pl ? pl.latency_ms_b1.toFixed(2) : '—'} ms (${pl ? pl.n_svdd : '—'} SVDDs).` +
+      (fc(1) && fc(joint.k) ? ` Extracting the features costs more than scoring them: about
+        ${fc(1).features_added_ms.toFixed(2)} ms for one layer and
+        ${fc(joint.k).features_added_ms.toFixed(2)} ms for ${joint.k}, on top of
+        ${fc(1).model_ms.toFixed(2)} ms for the classifier itself.` : ''));
+  }
+  $('cmpFacts').innerHTML = facts.map(f => `<li>${f}</li>`).join('');
+
+  $('cmpLegend').innerHTML = Object.entries(G_LABEL).map(([g, l]) =>
+    `<span><i style="background:var(--g-${g})"></i>${l}</span>`).join('') +
+    `<span><i style="background:var(--muted);width:2px"></i>${metric === 'auroc' ? 'coin toss' :
+      metric === 'tpr' ? 'guessing' : 'allowed'}</span>`;
+  const top = Math.max(chance, ...rows.map(val)) * 1.08 || 1;
+  const scale = metric === 'auroc' ? 1 : Math.min(1, top);
+  const winner = rows.reduce((m, r) => (m && val(m) >= val(r) ? m : r), null);
+  $('cmpChart').innerHTML = GRANS.map(g => {
+    const rs = byG(g).sort((x, y) => val(y) - val(x));
+    if (!rs.length) return '';
+    return `<div class="cmp-group"><span class="swatch" style="background:var(--g-${g})"></span>` +
+      `${G_LABEL[g]}</div>` + rs.map(r =>
+        `<div class="crow${r === winner ? ' best' : ''}" title="${r.taps}">` +
+        `<span class="name">${designLabel(r)}</span>` +
+        `<span class="track"><b style="width:${(100 * val(r) / scale).toFixed(1)}%;` +
+        `background:var(--g-${g})"></b><s style="left:${(100 * chance / scale).toFixed(1)}%"></s></span>` +
+        `<span class="num">${fmt(val(r))}</span>` +
+        `<span class="cost" title="scoring time per picture">${r.latency_ms_b1.toFixed(2)} ms` +
+        `${r.n_svdd > 1 ? ` · ${r.n_svdd} SVDDs` : ''}</span></div>`).join('');
+  }).join('');
+
+  $('cmpStripBox').hidden = !oracle.length;
+  if (oracle.length) {
+    const pts = [...oracle, ...rows.filter(r => r.granularity !== 'per_layer')];
+    const maxK = Math.max(...pts.map(r => r.k));
+    // honest axis: detection rate from 0, AUROC from just below the coin toss
+    const lo = metric === 'auroc' ? Math.min(0.45, ...pts.map(val)) : 0;
+    const hi = Math.max(metric === 'auroc' ? 0.6 : chance * 2, ...pts.map(val)) * 1.05;
+    const y = v => 100 - 100 * (v - lo) / ((hi - lo) || 1);
+    $('cmpStrip').innerHTML = pts.map(r =>
+      `<i title="${designLabel(r)}: ${fmt(val(r))}" style="left:${(100 * (r.k - 0.5) / maxK).toFixed(1)}%;` +
+      `top:${y(val(r)).toFixed(1)}%;background:var(--g-${r.granularity})"></i>`).join('') +
+      Array.from({ length: maxK }, (_, i) => `<span class="ax" style="left:${(100 * (i + 0.5) / maxK).toFixed(1)}%;` +
+        `bottom:-18px">${i + 1}</span>`).join('') +
+      `<span class="ax" style="left:-34px;top:-6px">${fmt(hi)}</span>` +
+      `<span class="ax" style="left:-34px;bottom:-6px">${fmt(lo)}</span>` +
+      `<span class="ax" style="left:-34px;top:${y(chance).toFixed(1)}%;margin-top:-7px">` +
+      `${fmt(chance)}</span><s style="position:absolute;left:0;right:0;top:${y(chance).toFixed(1)}%;` +
+      'border-top:1px dashed var(--muted);opacity:.5"></s>' +
+      '<span class="ax" style="left:0;right:0;bottom:-36px;text-align:center">layers watched</span>';
+  }
+
+  const head = cmp.detection
+    ? '<th>Design</th><th>Type</th><th>Layers</th><th>Detection rate</th><th>False alarms</th>' +
+      '<th>AUROC</th><th>AUPR</th><th>SVDDs</th><th>Support vectors</th><th>ms / picture</th>'
+    : '<th>Design</th><th>Type</th><th>Layers</th><th>False alarms</th><th>SVDDs</th>' +
+      '<th>Support vectors</th><th>ms / picture</th>';
+  $('cmpTable').innerHTML = `<tr>${head}</tr>` + GRANS.flatMap(byG).map(r => '<tr>' +
+    `<td>${designLabel(r)}</td><td>${G_LABEL[r.granularity]}</td><td>${r.k}</td>` +
+    (cmp.detection ? `<td>${fmt(r.tpr)}</td><td>${fmt(r.measured_fpr)}</td>` +
+      `<td>${fmt(r.auroc)}</td><td>${fmt(r.aupr)}</td>` : `<td>${fmt(r.measured_fpr)}</td>`) +
+    `<td>${r.n_svdd}</td><td>${r.support_vectors}</td><td>${r.latency_ms_b1.toFixed(3)}</td></tr>`).join('');
+}
+const GRANS = ['joint', 'subset', 'per_layer', 'single'];
+
+function setupComparison() {
+  const cmp = S.manifest.comparison || {};
+  const precs = Object.keys(cmp);
+  $('cmpSection').hidden = !precs.length;
+  if (!precs.length) return;
+  C.prec = precs.find(p => cmp[p].detection) || precs[0];
+  radios('cmpPrec', 'cmpPrec', precs.map(p => ({ value: p, label: p.toUpperCase() +
+    (cmp[p].detection ? '' : ' (no fault sweep)') })), C.prec);
+  $('cmpPrecBox').hidden = precs.length < 2;
+  radios('cmpTrack', 'cmpTrack', [{ value: 'H', label: 'Answer wrong or broken' },
+    { value: 'S', label: 'Answer unchanged' }], C.track);
+  radios('cmpMetric', 'cmpMetric', [{ value: 'tpr', label: 'Detection rate' },
+    { value: 'auroc', label: 'Ranking quality (AUROC)' }], C.metric);
+  $('cmpPrec').onchange = e => { C.prec = e.target.value; renderComparison(); };
+  $('cmpTrack').onchange = e => { C.track = e.target.value; renderComparison(); };
+  $('cmpMetric').onchange = e => { C.metric = e.target.value; renderComparison(); };
+  renderComparison();
+}
+
+// ---------- picture view ----------
+function pct(v) { return (100 * v).toFixed(v < 0.1 ? 1 : 0) + '%'; }
+
+async function refreshImage() {
+  if (!S.session || !S.current) return;
+  const k = S.alpha, tau = S.manifest.monitor.thresholds[k], cls = S.manifest.classes;
+  const [r] = await infer([S.current.pixels]);
+  $('pred').textContent = `${cls[r.pred]} · ${pct(r.probs[r.pred])}`;
+  $('truth').textContent = S.current.label ? `Correct answer: ${S.current.label}` : 'Your picture';
+  const top = r.probs.map((p, i) => [p, i]).sort((a, b) => b[0] - a[0]).slice(0, 3);
+  $('bars').innerHTML = top.map(([p, i]) =>
+    `<div class="bar"><span>${cls[i]}</span><i><b style="width:${(100 * p).toFixed(1)}%"></b></i>` +
+    `<span>${pct(p)}</span></div>`).join('');
+  const flagged = r.alarms[k];
+  $('verdict').className = 'chip ' + (flagged ? 'bad' : 'ok');
+  $('verdict').textContent = flagged ? 'Monitor: suspicious' : 'Monitor: looks normal';
+  const lo = -25, hi = Math.max(45, tau * 1.4);
+  const pos = v => Math.min(100, Math.max(0, 100 * (v - lo) / (hi - lo)));
+  $('meterFill').style.width = (Number.isFinite(r.score) ? pos(r.score) : 100) + '%';
+  $('meterTau').style.left = pos(tau) + '%';
+  $('scoreText').textContent = `Monitor score ${Number.isFinite(r.score) ? r.score.toFixed(2) : '∞'}` +
+    ` · threshold ${tau.toFixed(2)} (red line)`;
+  renderLayerPicture(r);
+  const ans = $('answer');
+  if (S.flips.length) {
+    const [b] = await infer([S.current.pixels], S.baseSession);
+    const same = r.pred === b.pred;
+    ans.hidden = false;
+    ans.className = 'chip ' + (same ? 'warn' : 'bad');
+    ans.textContent = same ? 'Answer unchanged by the fault' : 'Answer changed by the fault';
+  } else ans.hidden = true;
+}
+
+function select(sample, canvas) {
+  document.querySelectorAll('.gallery canvas').forEach(c => c.classList.remove('sel'));
+  if (canvas) canvas.classList.add('sel');
+  S.current = sample;
+  draw($('view'), sample.pixels);
+  refreshImage();
+}
+
+// ---------- fault injection ----------
+async function loadSession(bytes) {
+  return ort.InferenceSession.create(bytes, { executionProviders: ['wasm'] });
+}
+
+// ---------- weight formats ("Injection in weight") ----------
+// Each weight becomes a code in the chosen format; flips XOR that code, and the decoded value is
+// written back as FP32 so ONNX Runtime can run it. FP32 codes are the raw bytes of model.onnx.
+const u32 = new Uint32Array(1), f32v = new Float32Array(u32.buffer);
+const bitsToF32 = c => { u32[0] = c; return f32v[0]; };
+const rint = v => { const r = Math.round(v); return Math.abs(v % 1) === 0.5 && r % 2 ? r - 1 : r; };
+
+function minifloat(e, m) {  // IEEE-like; 4 exponent bits means FP8 E4M3 "FN" (no inf, one NaN)
+  const bias = 2 ** (e - 1) - 1, eMax = 2 ** e - 1, mMax = 2 ** m - 1, sign = 2 ** (e + m);
+  const fn = e === 4;
+  const decode = c => {
+    const E = (c >> m) & eMax, M = c & mMax, s = c & sign ? -1 : 1;
+    if (!fn && E === eMax) return M ? NaN : s * Infinity;
+    if (fn && E === eMax && M === mMax) return NaN;
+    return s * (E ? (1 + M / 2 ** m) * 2 ** (E - bias) : M * 2 ** (1 - bias - m));
+  };
+  const top = fn ? sign - 2 : eMax * 2 ** m - 1;  // largest finite positive code
+  const pos = Float64Array.from({ length: top + 1 }, (_, c) => decode(c));  // ascending
+  const encode = x => {  // round to nearest, ties to even, saturate at the largest finite value
+    if (Number.isNaN(x)) return fn ? sign - 1 : eMax * 2 ** m + 1;
+    const a = Math.abs(x), s = x < 0 || Object.is(x, -0) ? sign : 0;
+    if (a >= pos[top]) return s | top;
+    let lo = 0, hi = top;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (pos[mid] <= a) lo = mid; else hi = mid; }
+    const dl = a - pos[lo], dh = pos[hi] - a;
+    return s | (dl < dh || (dl === dh && lo % 2 === 0) ? lo : hi);
+  };
+  return { encode, decode };
+}
+
+function encodeWeights(fmt) {
+  const src = new DataView(S.original.buffer), enc = new Map();
+  const raw = fmt.key === 'fp32', int = fmt.kind === 'int';
+  const mf = !raw && !int ? minifloat(fmt.exp_bits, fmt.man_bits) : null;
+  const qmax = 2 ** (fmt.bits - 1) - 1, mask = 2 ** fmt.bits - 1;
+  for (const w of S.manifest.weights) {
+    const codes = new Uint32Array(w.numel), per = w.numel / w.shape[0];
+    const get = i => src.getFloat32(w.offset + 4 * i, true);
+    let scale = null;
+    if (raw) for (let i = 0; i < w.numel; i++) codes[i] = src.getUint32(w.offset + 4 * i, true);
+    else if (mf) for (let i = 0; i < w.numel; i++) codes[i] = mf.encode(get(i));
+    else {  // symmetric, one scale per output channel, codes in two's complement
+      scale = new Float64Array(w.shape[0]);
+      for (let c = 0; c < w.shape[0]; c++) {
+        let mx = 0;
+        for (let i = c * per; i < (c + 1) * per; i++) mx = Math.max(mx, Math.abs(get(i)));
+        scale[c] = mx / qmax || 1;
+        for (let i = c * per; i < (c + 1) * per; i++)
+          codes[i] = Math.min(qmax, Math.max(-qmax, rint(get(i) / scale[c]))) & mask;
+      }
+    }
+    enc.set(w.name, { codes, scale, per });
+  }
+  const q = c => (c > qmax ? c - mask - 1 : c);
+  const value = (w, i, c) => {
+    if (raw) return bitsToF32(c);
+    if (mf) return mf.decode(c);
+    const t = enc.get(w.name);
+    return q(c) * t.scale[Math.floor(i / t.per)];
+  };
+  return { raw, int, enc, q, value };
+}
+
+function writeAll(bytes, E) {  // every weight → its format's value; returns the largest change
+  const dv = new DataView(bytes.buffer), src = new DataView(S.original.buffer);
+  let err = 0;
+  for (const w of S.manifest.weights) {
+    const { codes } = E.enc.get(w.name);
+    for (let i = 0; i < w.numel; i++) {
+      const at = w.offset + 4 * i, v = E.value(w, i, codes[i]);
+      dv.setFloat32(at, v, true);
+      err = Math.max(err, Math.abs(v - src.getFloat32(at, true)));
+    }
+  }
+  return err;
+}
+
+function formatNote(f, err) {
+  const n = S.samples.length, acc = out => fmt(div(out.filter((o, i) =>
+    o.pred === S.manifest.classes.indexOf(S.samples[i].label)).length, n));
+  if (f.key === 'fp32') return 'Weights as exported: 32-bit floats (1 sign, 8 exponent, 23 ' +
+    'mantissa bits). Flips hit the raw bytes of model.onnx.' +
+    (S.manifest.faults.formats ? '' : ' This bundle was exported before the other formats ' +
+     'existed; re-run fidnn export to enable them.');
+  const layout = f.kind === 'float'
+    ? `rounded to the nearest ${f.label} value (1 sign, ${f.exp_bits} exponent, ${f.man_bits} ` +
+      `mantissa bits${f.key === 'fp8' ? ', E4M3' : ''})`
+    : `mapped to a ${f.bits}-bit integer code (−${2 ** (f.bits - 1) - 1} … ` +
+      `${2 ** (f.bits - 1) - 1}, one scale per output channel)`;
+  return `Every weight is ${layout} and stored back as FP32 so the model still runs. Largest ` +
+    `change to a weight: ${err.toPrecision(3)}. Accuracy on the ${n} test pictures: FP32 ` +
+    `${acc(S.fp32Out)} → ${f.label} ${acc(S.baseOut)}. Flips now hit the ${f.bits}-bit ` +
+    `${f.label} code (bit ${f.bits - 1} = sign).`;
+}
+
+async function setFormat(key) {
+  const f = S.formats.find(x => x.key === key);
+  setBusy(true, `Storing every weight as ${f.label}…`);
+  S.fmt = f;
+  S.flips = [];  // a flip is a bit of one format's code; it has no meaning in another format
+  S.E = encodeWeights(f);
+  let err = 0;
+  if (f.key === 'fp32') {
+    S.baseBytes = S.original; S.baseSession = S.fp32Session; S.baseOut = S.fp32Out;
+  } else {
+    S.baseBytes = S.original.slice();
+    err = writeAll(S.baseBytes, S.E);
+    S.baseSession = await loadSession(S.baseBytes);
+    S.baseOut = await infer(S.samples.map(s => s.pixels), S.baseSession);
+  }
+  radios('how', 'how', f.strata.map(s => ({ value: s.key, label: s.label })), f.strata[0].key);
+  $('bit').max = f.bits - 1;
+  $('bit').value = Math.max(0, f.bits - 2);
+  $('bitLabel').textContent = `Bit (0 = lowest, ${f.bits - 1} = sign)`;
+  $('fmtNote').textContent = formatNote(f, err);
+  await rebuild();
+}
+
+const picked = name => document.querySelector(`input[name="${name}"]:checked`).value;
+const randInt = n => Math.floor(Math.random() * n);
+
+// `inject.plan.sample_flips`: `budget` distinct (element, bit) pairs over the bucket's weights
+function sampleFlips(pool, bits, budget) {
+  const ends = [];
+  let total = 0;
+  for (const w of pool) { total += w.numel; ends.push(total); }
+  const draws = new Set();
+  while (draws.size < Math.min(budget, total * bits.length)) draws.add(randInt(total * bits.length));
+  return [...draws].map(p => {
+    const flat = Math.floor(p / bits.length), k = ends.findIndex(e => flat < e);
+    return { w: pool[k], index: flat - (k ? ends[k - 1] : 0), bit: bits[p % bits.length] };
+  });
+}
+
+// `DemoSession._extend`: flips accumulate until Reset; one (weight, index, bit) is flipped once
+async function addFlips(fresh) {
+  const seen = new Set(S.flips.map(f => `${f.w.name}|${f.index}|${f.bit}`));
+  const added = fresh.filter(f => !seen.has(`${f.w.name}|${f.index}|${f.bit}`));
+  S.flips.push(...added);
+  if (added.length) await rebuild();
+}
+
+function injectGrid(bucket, stratumKey, budget) {
+  const stratum = S.fmt.strata.find(s => s.key === stratumKey);
+  const pool = S.manifest.weights.filter(w => w.bucket === bucket);
+  return addFlips(sampleFlips(pool, stratum.bits, budget));
+}
+
+function inject() { return injectGrid(picked('where'), picked('how'), Number(picked('count'))); }
+
+function surprise() {  // as in `fidnn ui`: random place, one of the two most drastic strata, 4 flips
+  const f = S.manifest.faults;
+  const b = f.buckets[randInt(f.buckets.length)].key;
+  const s = S.fmt.strata[randInt(Math.min(2, S.fmt.strata.length))].key;
+  document.querySelector(`input[name="where"][value="${b}"]`).checked = true;
+  document.querySelector(`input[name="how"][value="${s}"]`).checked = true;
+  document.querySelector('input[name="count"][value="4"]').checked = true;
+  return injectGrid(b, s, 4);
+}
+
+function exact() {
+  const w = S.manifest.weights[Number($('layer').value)];
+  const index = Number($('index').value), bit = Number($('bit').value);
+  if (!Number.isInteger(index) || index < 0 || index >= w.numel) {
+    $('exactErr').textContent = `Weight index must be 0 … ${w.numel - 1} for ${w.name}.`;
+    return;
+  }
+  if (!Number.isInteger(bit) || bit < 0 || bit >= S.fmt.bits) {
+    $('exactErr').textContent = `Bit must be 0 … ${S.fmt.bits - 1} for ${S.fmt.label}.`;
+    return;
+  }
+  $('exactErr').textContent = '';
+  return addFlips([{ w, index, bit }]);
+}
+
+function radios(id, name, options, value) {
+  $(id).innerHTML = options.map(o => `<label><input type="radio" name="${name}" ` +
+    `value="${o.value}"${o.value === value ? ' checked' : ''}>${o.label}</label>`).join('');
+}
+
+async function rebuild() {
+  setBusy(true, 'Rebuilding the model and scoring the test pictures…');
+  const E = S.E, name = S.fmt.label, fp32 = S.fmt.key === 'fp32';
+  const bytes = S.flips.length ? S.baseBytes.slice() : S.baseBytes;
+  const dv = new DataView(bytes.buffer), now = new Map(), lines = [];
+  for (const f of S.flips) {  // flips on one weight compose: each XORs the code left by the last
+    const key = `${f.w.name}|${f.index}`;
+    const was = now.has(key) ? now.get(key) : E.enc.get(f.w.name).codes[f.index];
+    const code = (was ^ (1 << f.bit)) >>> 0, at = f.w.offset + 4 * f.index;
+    const before = E.value(f.w, f.index, was), after = E.value(f.w, f.index, code);
+    now.set(key, code);
+    if (E.raw) dv.setUint32(at, code, true); else dv.setFloat32(at, after, true);
+    const feeds = S.nTaps && f.w.tap ? L().taps.find(t => t.id === f.w.tap) : null;
+    lines.push(`${f.w.name}[${f.index}] ${name} bit ${f.bit}: ${before.toPrecision(4)} → ` +
+               `${after.toPrecision(4)}` + (E.int ? ` (code ${E.q(was)} → ${E.q(code)})` : '') +
+               (feeds ? `  ⚡ feeds ${feeds.label}` : ''));
+  }
+  S.session = S.flips.length ? await loadSession(bytes) : S.baseSession;
+  S.curOut = S.flips.length ? await infer(S.samples.map(s => s.pixels)) : S.baseOut;
+  $('flips').textContent = lines.join('\n');
+  const st = $('modelState');
+  st.className = 'chip ' + (S.flips.length ? 'bad' : fp32 ? 'ok' : 'warn');
+  st.textContent = (fp32 ? '' : `${name} weights · `) +
+    (S.flips.length ? `${S.flips.length} bit(s) flipped` : fp32 ? 'Model intact' : 'no flips');
+  renderScores();
+  await refreshImage();
+  setBusy(false, S.flips.length ? 'Corrupted model is running.'
+    : fp32 ? 'Original model restored.' : `${name} model is running, no bits flipped.`);
+}
+
+function setBusy(b, msg) {
+  ['inject', 'surprise', 'restore', 'exact', 'uploadBtn'].forEach(id => $(id).disabled = b);
+  document.querySelectorAll('#fmt input').forEach(i => { i.disabled = b; });
+  if (msg) $('status').textContent = msg;
+}
+
+// ---------- start ----------
+async function main() {
+  try {
+    S.manifest = await (await fetch('../manifest.json')).json();
+    S.original = new Uint8Array(await (await fetch('../' + S.manifest.files.model)).arrayBuffer());
+    const raw = await (await fetch('samples.json')).json();
+    S.samples = raw.map(s => ({ label: s.label,
+      pixels: Uint8Array.from(atob(s.pixels), c => c.charCodeAt(0)) }));
+  } catch (e) {
+    $('status').textContent = 'Could not load the model. Open this page through a web server ' +
+      '(python run.py --ui), not by double-clicking the file.';
+    throw e;
+  }
+  const m = S.manifest;
+  S.nTaps = m.monitor.per_layer ? m.monitor.per_layer.taps.length : 0;  // older bundles: none
+  $('layerBox').hidden = $('layerSection').hidden = !S.nTaps;
+  m.monitor.alphas.forEach((a, i) => $('alpha').add(new Option(
+    `${(100 * a).toLocaleString()} % of pictures`, i)));
+  $('alpha').value = m.monitor.alphas.indexOf(0.01);
+  S.alpha = Number($('alpha').value);
+  m.weights.forEach((w, i) => $('layer').add(new Option(
+    `${w.name} · ${w.bucket}${w.tap ? ` → ${w.tap}` : ''} · ${w.numel.toLocaleString()} numbers`,
+    i)));
+  // bundles exported before `faults.formats` existed offer FP32 only
+  S.formats = m.faults.formats ?? [{ key: 'fp32', label: 'FP32', kind: 'float', bits: 32,
+                                     exp_bits: 8, man_bits: 23, strata: m.faults.strata }];
+  radios('fmt', 'fmt', S.formats.map(f => ({ value: f.key, label: f.label })), 'fp32');
+  radios('where', 'where', m.faults.buckets.map(b => ({ value: b.key, label: b.label })), 'late');
+  radios('count', 'count', m.faults.budgets.map(n => ({ value: String(n), label: String(n) })),
+         String(m.faults.budgets[0]));
+  $('nSamples').textContent = S.samples.length;
+  $('foot').textContent = `${m.name} · ${m.caveats[0]}`;
+  const ref = m.metrics;
+  if (ref) {
+    const r = ref.classifier;
+    $('reference').textContent = `Reference, measured at export on ${ref.measured_on}: ` +
+      `accuracy ${fmt(r.accuracy)}, macro precision ${fmt(r.macro.precision)}, ` +
+      `recall ${fmt(r.macro.recall)}, F1 ${fmt(r.macro.f1)}, F2 ${fmt(r.macro.f2)}; ` +
+      'monitor false-alarm rate ' +
+      m.monitor.alphas.map(a => `${fmt(ref.monitor_false_alarm_rate[String(a)])} at ` +
+        `${(100 * a).toLocaleString()} %`).join(', ') + '.';
+  }
+
+  $('status').textContent = 'Scoring the test pictures…';
+  S.fp32Session = await loadSession(S.original);
+  S.fp32Out = await infer(S.samples.map(s => s.pixels), S.fp32Session);
+  const gal = $('gallery');
+  S.samples.slice(0, GALLERY).forEach(s => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32; c.title = s.label;
+    draw(c, s.pixels);
+    c.onclick = () => select(s, c);
+    gal.appendChild(c);
+  });
+  setupComparison();
+  await setFormat('fp32');
+  setBusy(false, 'Ready.');
+  select(S.samples[0], gal.firstChild);
+
+  $('alpha').onchange = () => {
+    S.alpha = Number($('alpha').value); renderScores(); refreshImage(); renderComparison();
+  };
+  $('fmt').onchange = e => setFormat(e.target.value);
+  $('inject').onclick = inject;
+  $('surprise').onclick = surprise;
+  $('exact').onclick = exact;
+  $('restore').onclick = () => { S.flips = []; rebuild(); };
+  $('uploadBtn').onclick = () => $('upload').click();
+  $('upload').onchange = async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const pixels = await fileToPixels(f);
+    select({ label: null, pixels }, null);
+  };
+}
+setBusy(true);
+main();
+</script>
+</body>
+</html>
